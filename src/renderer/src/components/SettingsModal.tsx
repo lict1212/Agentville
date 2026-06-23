@@ -217,6 +217,44 @@ function UpdateSettingsSection({ t }: { t: any }) {
   )
 }
 
+// Close-confirmation toggle. Mirrors the `confirmOnClose` setting that the
+// in-app close dialog's "don't ask again" checkbox also writes. Persists
+// immediately so users who accidentally disabled the prompt can re-enable it.
+function CloseConfirmSetting({ t }: { t: any }) {
+  const [enabled, setEnabled] = useState(true)
+
+  useEffect(() => {
+    ;(window.api as any).getConfirmOnClose?.().then((v: boolean) => setEnabled(v !== false))
+  }, [])
+
+  const toggle = (): void => {
+    setEnabled((prev) => {
+      const next = !prev
+      ;(window.api as any).setConfirmOnClose?.(next)
+      return next
+    })
+  }
+
+  return (
+    <div className="flex items-center justify-between py-1">
+      <div>
+        <p className="text-xs font-medium" style={{ color: 'var(--text-secondary)' }}>{t.confirmOnCloseLabel}</p>
+        <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>{t.confirmOnCloseDesc}</p>
+      </div>
+      <button
+        onClick={toggle}
+        className="relative flex-shrink-0 w-9 h-5 rounded-full transition-colors"
+        style={{ backgroundColor: enabled ? 'var(--accent-blue)' : 'var(--border)' }}
+      >
+        <span
+          className="absolute top-0.5 w-4 h-4 rounded-full transition-transform"
+          style={{ backgroundColor: '#ffffff', left: 2, transform: enabled ? 'translateX(16px)' : 'translateX(0)' }}
+        />
+      </button>
+    </div>
+  )
+}
+
 interface GeneralPanelProps {
   t: any
   lang: Lang
@@ -298,6 +336,11 @@ function GeneralPanel({
           />
         </button>
       </div>
+
+      <div style={{ height: 1, backgroundColor: 'var(--border)', margin: '20px 0' }} />
+
+      {/* Confirm before quitting */}
+      <CloseConfirmSetting t={t} />
 
       <div style={{ height: 1, backgroundColor: 'var(--border)', margin: '20px 0' }} />
 

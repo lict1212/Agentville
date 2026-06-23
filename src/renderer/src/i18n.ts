@@ -140,6 +140,8 @@ export const T = {
     quitSavingExiting: '正在保存并退出…',
     quitDontAskAgain: '不再提示',
     quitConfirm: '关闭',
+    confirmOnCloseLabel: '关闭时确认',
+    confirmOnCloseDesc: '关闭应用时弹出确认窗，防止误关。关掉则直接退出。',
 
     // Auto-update
     updateSectionTitle: '软件更新',
@@ -477,6 +479,8 @@ export const T = {
     quitSavingExiting: 'Saving and exiting…',
     quitDontAskAgain: "Don't ask again",
     quitConfirm: 'Quit',
+    confirmOnCloseLabel: 'Confirm before quitting',
+    confirmOnCloseDesc: 'Show a confirmation dialog when closing the app, to prevent accidental quits. Off = quit immediately.',
 
     // Auto-update
     updateSectionTitle: 'Software Update',
