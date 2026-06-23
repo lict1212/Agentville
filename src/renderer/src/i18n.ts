@@ -133,6 +133,31 @@ export const T = {
     save: '保存',
     saving: '保存中...',
 
+    // App close confirmation
+    quitTitle: '关闭 Agentville？',
+    quitMessageIdle: '确定要关闭应用吗？',
+    quitMessageRunning: (n: number) => `有 ${n} 个 Agent 正在运行，关闭前会自动保存它们的记忆。确定关闭？`,
+    quitSavingExiting: '正在保存并退出…',
+    quitDontAskAgain: '不再提示',
+    quitConfirm: '关闭',
+
+    // Auto-update
+    updateSectionTitle: '软件更新',
+    updateCurrentVersion: (v: string) => `当前版本 v${v}`,
+    updateCheckNow: '检查更新',
+    updateChecking: '检查中…',
+    updateUpToDate: '已是最新版本',
+    updateDevMode: '开发模式不检查更新',
+    updateCheckFailed: '检查失败',
+    updateAvailableTitle: '发现新版本',
+    updateAvailableBody: (v: string) => `新版本 v${v} 可用，是否现在更新？`,
+    updateDownload: '更新',
+    updateLater: '稍后',
+    updateDownloading: '下载中',
+    updateDownloaded: (v: string) => `v${v} 已下载完成`,
+    updateRestartInstall: '重启并安装',
+    updateErrorTitle: '更新出错',
+
     // Theme names
     themeDefault: '默认',
     themeSlate: '石板',
@@ -444,6 +469,31 @@ export const T = {
     confirmTitle: 'Please confirm',
     save: 'Save',
     saving: 'Saving...',
+
+    // App close confirmation
+    quitTitle: 'Quit Agentville?',
+    quitMessageIdle: 'Are you sure you want to quit?',
+    quitMessageRunning: (n: number) => `${n} agent${n === 1 ? ' is' : 's are'} still running. Their memory will be saved before quitting. Quit now?`,
+    quitSavingExiting: 'Saving and exiting…',
+    quitDontAskAgain: "Don't ask again",
+    quitConfirm: 'Quit',
+
+    // Auto-update
+    updateSectionTitle: 'Software Update',
+    updateCurrentVersion: (v: string) => `Current version v${v}`,
+    updateCheckNow: 'Check for updates',
+    updateChecking: 'Checking…',
+    updateUpToDate: 'You are on the latest version',
+    updateDevMode: 'Updates are not checked in dev mode',
+    updateCheckFailed: 'Check failed',
+    updateAvailableTitle: 'Update available',
+    updateAvailableBody: (v: string) => `Version v${v} is available. Update now?`,
+    updateDownload: 'Update',
+    updateLater: 'Later',
+    updateDownloading: 'Downloading',
+    updateDownloaded: (v: string) => `v${v} downloaded`,
+    updateRestartInstall: 'Restart & install',
+    updateErrorTitle: 'Update error',
 
     // Theme names
     themeDefault: 'Default',

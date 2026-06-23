@@ -3,6 +3,7 @@ import { join } from 'path'
 import { pathToFileURL } from 'url'
 import { execFileSync, spawn } from 'child_process'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
+import { autoUpdater } from 'electron-updater'
 import appIcon from '../../resources/icon.png?asset'
 import fs from 'fs'
 import {
@@ -184,6 +185,61 @@ function saveBounds(bounds: Electron.Rectangle): void {
   } catch { /* ignore */ }
 }
 
+// Set once the user has confirmed the quit (via the in-app modal) or an update
+// install is restarting the app. Lets the window `close` handler stop prompting
+// and actually let the window go.
+let quitConfirmed = false
+
+// Save every running agent's memory before the app goes away. Used by both the
+// quit-confirm flow and the update-install flow. Does NOT close the window.
+async function saveAllRunningAgents(): Promise<void> {
+  const running = getAllRunningIds()
+  if (running.length === 0) return
+  const s = await getStore()
+  const projects: Project[] = s.get('projects', [])
+  const defaultCli = s.get('defaultCliCommand', 'claude') as string
+  await Promise.all(running.map((id) => {
+    const project = projects.find((p) => p.id === id)
+    const cliCommand = project?.cliCommand || defaultCli || 'claude'
+    const cliConfig = resolveCliConfig(cliCommand)
+    const saveConfig = cliConfig.saveCommand
+      ? { saveCommand: cliConfig.saveCommand, doneKeywords: cliConfig.doneKeywords, isClaudeLike: cliConfig.isClaudeLike }
+      : undefined
+    return stopProcess(id, saveConfig, true)
+  })).catch(() => { /* best-effort save; never block the quit */ })
+}
+
+// Save running agents, then actually destroy the window (real quit).
+async function performQuit(win: BrowserWindow): Promise<void> {
+  await saveAllRunningAgents()
+  quitConfirmed = true
+  if (!win.isDestroyed()) win.destroy()
+}
+
+// Wire electron-updater events through to the renderer. autoDownload stays off:
+// we surface "update available", then the user chooses to download/install.
+function setupAutoUpdater(): void {
+  autoUpdater.autoDownload = false
+  autoUpdater.autoInstallOnAppQuit = true
+  const send = (channel: string, payload?: unknown): void => {
+    const win = BrowserWindow.getAllWindows()[0]
+    if (win && !win.isDestroyed()) win.webContents.send(channel, payload)
+  }
+  autoUpdater.on('update-available', (info) => {
+    send('update:available', {
+      version: info.version,
+      releaseNotes: typeof info.releaseNotes === 'string' ? info.releaseNotes : null,
+      releaseDate: info.releaseDate ?? null,
+    })
+  })
+  autoUpdater.on('update-not-available', () => send('update:not-available'))
+  autoUpdater.on('download-progress', (p) => {
+    send('update:progress', { percent: p.percent, bytesPerSecond: p.bytesPerSecond, transferred: p.transferred, total: p.total })
+  })
+  autoUpdater.on('update-downloaded', (info) => send('update:downloaded', { version: info.version }))
+  autoUpdater.on('error', (err) => send('update:error', { message: err instanceof Error ? err.message : String(err) }))
+}
+
 function createWindow(): void {
   const saved = sanitizeBounds(getSavedBounds())
   const mainWindow = new BrowserWindow({
@@ -225,25 +281,21 @@ function createWindow(): void {
     if (!mainWindow.isDestroyed() && !mainWindow.isVisible()) mainWindow.show()
   }, 4000)
 
-  // Save all running agents before closing
+  // Intercept close: ask the renderer to show the in-app confirm modal first.
+  // Once confirmed (quitConfirmed) or when the user disabled the prompt, we save
+  // every running agent and then actually destroy the window.
   mainWindow.on('close', (e) => {
-    const running = getAllRunningIds()
-    if (running.length === 0) return
-
+    if (quitConfirmed) return // already confirmed → let it close
     e.preventDefault()
     getStore().then((s) => {
-      const projects: Project[] = s.get('projects', [])
-      const defaultCli = s.get('defaultCliCommand', 'claude') as string
-      Promise.all(running.map((id) => {
-        const project = projects.find((p) => p.id === id)
-        const cliCommand = project?.cliCommand || defaultCli || 'claude'
-        const cliConfig = resolveCliConfig(cliCommand)
-        const saveConfig = cliConfig.saveCommand
-          ? { saveCommand: cliConfig.saveCommand, doneKeywords: cliConfig.doneKeywords }
-          : undefined
-        return stopProcess(id, saveConfig, true)
-      })).finally(() => {
-        mainWindow.destroy()
+      const confirmOnClose = s.get('confirmOnClose', true) as boolean
+      if (!confirmOnClose) {
+        performQuit(mainWindow)
+        return
+      }
+      // Ask the renderer to confirm. It calls back via the `app:confirmQuit` IPC.
+      mainWindow.webContents.send('app:close-requested', {
+        runningCount: getAllRunningIds().length,
       })
     })
   })
@@ -437,6 +489,60 @@ async function registerIpcHandlers(): Promise<void> {
         win.setTitleBarOverlay({ color, symbolColor, height: 38 })
       } catch { /* ignore on platforms that don't support it */ }
     }
+  })
+
+  // App lifecycle / version
+  ipcMain.handle('app:getVersion', () => app.getVersion())
+
+  // Renderer confirmed the quit (from the in-app close-confirm modal). Optionally
+  // persist "don't ask again", then save running agents and close.
+  ipcMain.handle('app:confirmQuit', async (_, args?: { dontAskAgain?: boolean }) => {
+    if (args?.dontAskAgain) {
+      const s = await getStore()
+      s.set('confirmOnClose', false)
+    }
+    const win = BrowserWindow.getAllWindows()[0]
+    if (win) await performQuit(win)
+    return true
+  })
+
+  // Whether to prompt on close (default true).
+  ipcMain.handle('app:getConfirmOnClose', async () => {
+    const s = await getStore()
+    return s.get('confirmOnClose', true) as boolean
+  })
+  ipcMain.handle('app:setConfirmOnClose', async (_, { value }: { value: boolean }) => {
+    const s = await getStore()
+    s.set('confirmOnClose', !!value)
+    return true
+  })
+
+  // Auto-update (electron-updater, GitHub provider). autoDownload is off — the
+  // renderer drives download/install after the user opts in.
+  ipcMain.handle('update:check', async () => {
+    if (!app.isPackaged) return { devMode: true as const }
+    try {
+      const r = await autoUpdater.checkForUpdates()
+      return { ok: true as const, version: r?.updateInfo?.version ?? null }
+    } catch (e) {
+      return { ok: false as const, error: e instanceof Error ? e.message : String(e) }
+    }
+  })
+  ipcMain.handle('update:download', async () => {
+    try {
+      await autoUpdater.downloadUpdate()
+      return { ok: true as const }
+    } catch (e) {
+      return { ok: false as const, error: e instanceof Error ? e.message : String(e) }
+    }
+  })
+  ipcMain.handle('update:install', async () => {
+    // Persist running agents' memory before the updater restarts the app.
+    await saveAllRunningAgents()
+    quitConfirmed = true
+    // Defer so this IPC call can return before the app tears down.
+    setImmediate(() => autoUpdater.quitAndInstall())
+    return { ok: true as const }
   })
 
   // Custom notification sounds: stored under userData/sounds. Users drop their
@@ -1209,6 +1315,13 @@ app.whenReady().then(async () => {
 
   await registerIpcHandlers()
   createWindow()
+
+  // Auto-update: only when packaged (electron-updater has no metadata in dev).
+  // Check shortly after startup so the window is ready to receive events.
+  setupAutoUpdater()
+  if (app.isPackaged) {
+    setTimeout(() => { autoUpdater.checkForUpdates().catch(() => { /* offline / no release yet */ }) }, 3000)
+  }
 
   app.on('activate', function () {
     if (BrowserWindow.getAllWindows().length === 0) createWindow()

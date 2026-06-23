@@ -200,6 +200,54 @@ const api = {
     }
     ipcRenderer.on('project:focus-request', handler)
     return () => ipcRenderer.removeListener('project:focus-request', handler)
+  },
+
+  // App lifecycle / version
+  getAppVersion: (): Promise<string> => ipcRenderer.invoke('app:getVersion'),
+  getConfirmOnClose: (): Promise<boolean> => ipcRenderer.invoke('app:getConfirmOnClose'),
+  setConfirmOnClose: (value: boolean): Promise<boolean> =>
+    ipcRenderer.invoke('app:setConfirmOnClose', { value }),
+  // Renderer calls this after the user confirms the in-app close dialog.
+  confirmQuit: (dontAskAgain?: boolean): Promise<boolean> =>
+    ipcRenderer.invoke('app:confirmQuit', { dontAskAgain: !!dontAskAgain }),
+  // Main asks the renderer to show the close-confirm modal.
+  onCloseRequested: (callback: (runningCount: number) => void) => {
+    const handler = (_: Electron.IpcRendererEvent, payload: { runningCount: number }) => {
+      callback(payload?.runningCount ?? 0)
+    }
+    ipcRenderer.on('app:close-requested', handler)
+    return () => ipcRenderer.removeListener('app:close-requested', handler)
+  },
+
+  // Auto-update
+  checkForUpdates: (): Promise<{ devMode?: boolean; ok?: boolean; version?: string | null; error?: string }> =>
+    ipcRenderer.invoke('update:check'),
+  downloadUpdate: (): Promise<{ ok: boolean; error?: string }> => ipcRenderer.invoke('update:download'),
+  installUpdate: (): Promise<{ ok: boolean }> => ipcRenderer.invoke('update:install'),
+  onUpdateAvailable: (callback: (info: { version: string; releaseNotes: string | null; releaseDate: string | null }) => void) => {
+    const handler = (_: Electron.IpcRendererEvent, info: { version: string; releaseNotes: string | null; releaseDate: string | null }) => callback(info)
+    ipcRenderer.on('update:available', handler)
+    return () => ipcRenderer.removeListener('update:available', handler)
+  },
+  onUpdateNotAvailable: (callback: () => void) => {
+    const handler = (): void => callback()
+    ipcRenderer.on('update:not-available', handler)
+    return () => ipcRenderer.removeListener('update:not-available', handler)
+  },
+  onUpdateProgress: (callback: (p: { percent: number; bytesPerSecond: number; transferred: number; total: number }) => void) => {
+    const handler = (_: Electron.IpcRendererEvent, p: { percent: number; bytesPerSecond: number; transferred: number; total: number }) => callback(p)
+    ipcRenderer.on('update:progress', handler)
+    return () => ipcRenderer.removeListener('update:progress', handler)
+  },
+  onUpdateDownloaded: (callback: (info: { version: string }) => void) => {
+    const handler = (_: Electron.IpcRendererEvent, info: { version: string }) => callback(info)
+    ipcRenderer.on('update:downloaded', handler)
+    return () => ipcRenderer.removeListener('update:downloaded', handler)
+  },
+  onUpdateError: (callback: (info: { message: string }) => void) => {
+    const handler = (_: Electron.IpcRendererEvent, info: { message: string }) => callback(info)
+    ipcRenderer.on('update:error', handler)
+    return () => ipcRenderer.removeListener('update:error', handler)
   }
 }
 

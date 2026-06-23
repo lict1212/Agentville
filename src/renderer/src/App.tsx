@@ -13,6 +13,7 @@ import { NewProjectModal } from './components/NewProjectModal'
 import { DuplicateAgentModal } from './components/DuplicateAgentModal'
 import { MigrateWorkspaceModal } from './components/MigrateWorkspaceModal'
 import { SessionSwitcher, type SwitcherItem } from './components/SessionSwitcher'
+import { QuitConfirmModal } from './components/QuitConfirmModal'
 import { useStore } from './store/useStore'
 import { T } from './i18n'
 import { playDoneSound, playAlertSound } from './utils/sound'
@@ -41,6 +42,8 @@ export default function App() {
   const [newProjectTargetGroup, setNewProjectTargetGroup] = useState<string | null>(null)
   const [duplicateSource, setDuplicateSource] = useState<{ id: string; name: string; initialName: string } | null>(null)
   const [showMigrateModal, setShowMigrateModal] = useState(false)
+  // In-app close confirmation: set when the main process intercepts window close.
+  const [quitPrompt, setQuitPrompt] = useState<{ runningCount: number } | null>(null)
   const [globalCliDefault, setGlobalCliDefault] = useState('claude')
   const [cliRegistry, setCliRegistry] = useState<Record<string, { memoryFile: string | null; name?: string; installHint?: string }>>({})
   const [mainView, setMainView] = useState<'terminal' | 'monitor'>('terminal')
@@ -326,6 +329,13 @@ export default function App() {
       clearNotification(projectId)
     }) ?? (() => {})
     return () => { unsubStatus(); unsubExit(); unsubName(); unsubAutoSave(); unsubCliNotFound(); unsubNotify(); unsubFocusReq() }
+  }, [])
+
+  // Main process asks us to confirm before quitting (in-app modal).
+  useEffect(() => {
+    return (window.api as any).onCloseRequested?.((runningCount: number) => {
+      setQuitPrompt({ runningCount })
+    })
   }, [])
 
   const handleNewProject = useCallback((groupId: string | null) => {
@@ -710,6 +720,13 @@ export default function App() {
           initialName={duplicateSource.initialName}
           onClose={() => setDuplicateSource(null)}
           onConfirm={handleConfirmDuplicate}
+        />
+      )}
+
+      {quitPrompt && (
+        <QuitConfirmModal
+          runningCount={quitPrompt.runningCount}
+          onCancel={() => setQuitPrompt(null)}
         />
       )}
 

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react'
-import { X, Settings, Puzzle, ChevronRight, Sparkles, ScrollText, Bell, Play, FolderOpen, Sliders } from 'lucide-react'
+import { X, Settings, Puzzle, ChevronRight, Sparkles, ScrollText, Bell, Play, FolderOpen, Sliders, RefreshCw } from 'lucide-react'
 import { T, type Lang } from '../i18n'
 import { useStore } from '../store/useStore'
 import { RULE_PRESETS, RulesChipSection, type RulePresetId, type CustomRule } from './RolePanel'
@@ -167,6 +167,56 @@ function NavItem({
 // Panels
 // =========================================================================
 
+// Software update row: current version + manual "check for updates". When an
+// update exists, the floating UpdateNotice (mounted at app root) drives the
+// download/install flow; here we only report the check result inline.
+function UpdateSettingsSection({ t }: { t: any }) {
+  const [version, setVersion] = useState('')
+  const [checking, setChecking] = useState(false)
+  const [status, setStatus] = useState<string | null>(null)
+
+  useEffect(() => {
+    ;(window.api as any).getAppVersion?.().then((v: string) => setVersion(v ?? ''))
+  }, [])
+
+  const check = async (): Promise<void> => {
+    setChecking(true)
+    setStatus(null)
+    const r = await (window.api as any).checkForUpdates?.()
+    setChecking(false)
+    if (!r) { setStatus(t.updateCheckFailed); return }
+    if (r.devMode) { setStatus(t.updateDevMode); return }
+    if (r.ok === false) { setStatus(t.updateCheckFailed); return }
+    // r.version is the latest available; if it equals current we're up to date.
+    // Otherwise the main process has emitted update:available → the floating
+    // notice is already showing, so no inline status needed.
+    if (!r.version || r.version === version) setStatus(t.updateUpToDate)
+    else setStatus(null)
+  }
+
+  return (
+    <div className="flex items-center justify-between py-1">
+      <div>
+        <p className="text-xs font-medium" style={{ color: 'var(--text-secondary)' }}>{t.updateSectionTitle}</p>
+        <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>
+          {version ? t.updateCurrentVersion(version) : ''}{status ? ` · ${status}` : ''}
+        </p>
+      </div>
+      <button
+        onClick={check}
+        disabled={checking}
+        className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs transition-colors disabled:opacity-50"
+        style={{ backgroundColor: 'var(--bg-card)', border: '1px solid var(--border)', color: 'var(--text-secondary)' }}
+        onMouseEnter={(e) => { if (!checking) (e.currentTarget as HTMLElement).style.borderColor = 'var(--accent-blue)' }}
+        onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.borderColor = 'var(--border)' }}
+      >
+        <RefreshCw size={12} className={checking ? 'animate-spin' : ''} />
+        {checking ? t.updateChecking : t.updateCheckNow}
+      </button>
+    </div>
+  )
+}
+
 interface GeneralPanelProps {
   t: any
   lang: Lang
@@ -248,6 +298,11 @@ function GeneralPanel({
           />
         </button>
       </div>
+
+      <div style={{ height: 1, backgroundColor: 'var(--border)', margin: '20px 0' }} />
+
+      {/* Software update */}
+      <UpdateSettingsSection t={t} />
     </div>
   )
 }
