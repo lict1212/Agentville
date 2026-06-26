@@ -34,12 +34,15 @@ interface TerminalPaneProps {
 const xtermTheme = {
   background: '#0d1117',
   foreground: '#e6edf3',
-  // Hide xterm's own bar cursor — every CLI we host (Claude Code, bash,
-  // Gemini, Codex) draws its own prompt cursor, and xterm's tracks the PTY
-  // cursor so it visibly jitters across thinking-spinner frames. Transparent
-  // removes the visual without disabling the helper-textarea (IME still works).
-  cursor: 'rgba(0,0,0,0)',
-  cursorAccent: 'rgba(0,0,0,0)',
+  // Visible input caret. xterm renders the single real terminal cursor at the
+  // PTY-reported position — this IS the cursor that line-mode CLIs (shells,
+  // Claude Code's input box) rely on, so it must be visible or you can't see
+  // where you're typing. Full-screen TUIs that paint their own cursor hide the
+  // real one via DECTCEM (?25l), which xterm honours automatically, so there's
+  // no double cursor. cursorInactiveStyle:'none' (set on the Terminal below)
+  // hides it when the pane isn't focused to cut clutter.
+  cursor: '#e6edf3',
+  cursorAccent: '#0d1117',
   selectionBackground: '#264f78',
   black: '#484f58',
   brightBlack: '#6e7681',
@@ -145,6 +148,7 @@ export function TerminalPane({ project, isRunning, globalCliDefault, memoryFile,
       lineHeight: 1.4,
       cursorBlink: true,
       cursorStyle: 'bar',
+      cursorInactiveStyle: 'none',
       scrollback: 5000,
       allowTransparency: true,
       convertEol: true,

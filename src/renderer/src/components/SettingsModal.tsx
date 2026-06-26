@@ -671,6 +671,11 @@ export function SettingsModal({ onClose, onOpenMcp, onOpenSkills }: SettingsModa
   const [autoSaveEnabled, setAutoSaveEnabled] = useState(false)
   const [saving, setSaving] = useState(false)
   const [activeTheme, setActiveTheme] = useState(() => localStorage.getItem('app-theme') ?? 'default')
+  const [appVersion, setAppVersion] = useState('')
+
+  useEffect(() => {
+    ;(window.api as any).getAppVersion?.().then((v: string) => setAppVersion(v ?? ''))
+  }, [])
 
   // Local mirror of notification prefs — committed to store + electron-store on Save
   const [notifEnabled, setNotifEnabled] = useState(notificationSoundEnabled)
@@ -944,6 +949,11 @@ export function SettingsModal({ onClose, onOpenMcp, onOpenSkills }: SettingsModa
           >
             {saving ? t.saving : t.save}
           </button>
+        </div>
+
+        {/* App version — shown at the very bottom of Settings */}
+        <div className="text-center pb-3 -mt-1 select-text" style={{ fontSize: '10px', color: 'var(--text-muted)' }}>
+          Agentville{appVersion ? ` v${appVersion}` : ''}
         </div>
       </div>
     </div>
