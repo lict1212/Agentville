@@ -1,6 +1,6 @@
 {
   "name": "agentville",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "description": "Claude Code multi-agent visual management desktop app",
   "main": "out/main/index.js",
   "scripts": {
