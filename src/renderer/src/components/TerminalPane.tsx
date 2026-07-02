@@ -110,21 +110,36 @@ export function TerminalPane({ project, isRunning, globalCliDefault, memoryFile,
     setTimeout(() => terminalRef.current?.focus(), 0)
   }, [onSaveMemory])
 
+  // Keep isRunning in a ref so onData/redraw handlers always see the latest value
+  const isRunningRef = useRef(isRunning)
+  isRunningRef.current = isRunning
+
   const handleRedraw = useCallback(() => {
     const term = terminalRef.current
     if (!term || !project) return
+    // Reset and replay in the SAME task. An earlier version deferred the
+    // replay to requestAnimationFrame, but live PTY chunks arriving in that
+    // gap were written onto the just-cleared screen, so the full replay then
+    // landed on a non-empty screen with a displaced cursor — reproducing the
+    // exact overlap glitch the button was meant to fix.
     term.reset()
-    // Defer the replay one frame so xterm fully settles the reset before we
-    // start streaming bytes back in. Without this, glitched canvas state
-    // can survive into the new buffer write — exactly the case where the
-    // synchronous Redraw path felt like it "did nothing."
-    requestAnimationFrame(() => {
-      const t = terminalRef.current
-      if (!t) return
-      const buffer = outputBuffers.current.get(project.id)
-      if (buffer) t.write(buffer)
-      t.focus()
-    })
+    const buffer = outputBuffers.current.get(project.id)
+    if (buffer) term.write(buffer)
+    term.focus()
+    // Replaying history can faithfully reproduce corrupted bytes, so also
+    // jiggle the PTY size: the CLI receives a resize (SIGWINCH) and repaints
+    // a fresh full frame — the only recovery that doesn't depend on waiting
+    // for new output to paper over the bad frame.
+    if (isRunningRef.current) {
+      const id = project.id
+      window.api.resizePty(id, Math.max(2, term.cols - 1), term.rows)
+      setTimeout(() => {
+        const t = terminalRef.current
+        if (t && currentProjectIdRef.current === id) {
+          window.api.resizePty(id, t.cols, t.rows)
+        }
+      }, 60)
+    }
   }, [project?.id])
 
   const handleSaveClick = useCallback(() => {
@@ -320,10 +335,6 @@ export function TerminalPane({ project, isRunning, globalCliDefault, memoryFile,
     }
   }, [])
 
-  // Keep isRunning in a ref so the onData handler always sees the latest value
-  const isRunningRef = useRef(isRunning)
-  isRunningRef.current = isRunning
-
   // Register keyboard input handler once per project
   useEffect(() => {
     const term = terminalRef.current
@@ -348,9 +359,18 @@ export function TerminalPane({ project, isRunning, globalCliDefault, memoryFile,
       // Buffer output per project (cap at 200KB)
       const MAX = 200 * 1024
       const prev = outputBuffers.current.get(id) ?? ''
-      const next = prev.length + data.length > MAX
-        ? (prev + data).slice(-(MAX))
-        : prev + data
+      let next = prev + data
+      if (next.length > MAX) {
+        // Never cut mid escape-sequence (or mid surrogate pair): replaying a
+        // stream that starts with half an ANSI sequence prints garbage. Align
+        // the cut to the next ESC (start of a fresh sequence) or just past the
+        // next newline, whichever drops less.
+        const from = next.length - MAX
+        const nl = next.indexOf('\n', from)
+        const esc = next.indexOf('\x1b', from)
+        const start = Math.min(nl === -1 ? Infinity : nl + 1, esc === -1 ? Infinity : esc)
+        next = next.slice(start === Infinity ? from : start)
+      }
       outputBuffers.current.set(id, next)
 
       // Write to terminal only if this is the active project
@@ -389,6 +409,14 @@ export function TerminalPane({ project, isRunning, globalCliDefault, memoryFile,
     }
 
     term.focus()
+
+    // Sync this project's PTY to the terminal's current size. resizePty is
+    // otherwise only called for the ACTIVE project (on start / window resize),
+    // so if the window was resized while another session was active, the
+    // incoming PTY still renders at its stale width — wrap/overlap glitches.
+    if (isRunningRef.current) {
+      window.api.resizePty(project.id, term.cols, term.rows)
+    }
   }, [project?.id])
 
   // Sync PTY size whenever isRunning turns true
