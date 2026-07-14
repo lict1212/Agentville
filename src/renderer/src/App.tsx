@@ -60,6 +60,16 @@ export default function App() {
 
   const activeProject = projects.find((p) => p.id === activeProjectId) ?? null
 
+  // First launch: adopt the language picked in the installer. localStorage
+  // 'app-lang' only exists once the user (or this effect) has chosen a
+  // language, so this can never override an explicit in-app choice.
+  useEffect(() => {
+    if (localStorage.getItem('app-lang')) return
+    ;(window.api as any).getInstallerLanguage?.().then((l: 'zh' | 'en' | null) => {
+      if (l === 'zh' || l === 'en') useStore.getState().setLang(l)
+    })
+  }, [])
+
   // Apply saved theme on mount
   useEffect(() => {
     const saved = localStorage.getItem('app-theme') ?? 'default'

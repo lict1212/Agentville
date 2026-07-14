@@ -494,6 +494,20 @@ async function registerIpcHandlers(): Promise<void> {
   // App lifecycle / version
   ipcMain.handle('app:getVersion', () => app.getVersion())
 
+  // Language picked in the installer's language selector, written by
+  // build/installer.nsh. The renderer adopts it as the default UI language
+  // only when the user hasn't chosen a language in-app yet.
+  ipcMain.handle('app:getInstallerLanguage', () => {
+    try {
+      const raw = fs
+        .readFileSync(join(app.getPath('userData'), 'installer-language.txt'), 'utf8')
+        .trim()
+      return raw === 'zh' || raw === 'en' ? raw : null
+    } catch {
+      return null
+    }
+  })
+
   // Renderer confirmed the quit (from the in-app close-confirm modal). Optionally
   // persist "don't ask again", then save running agents and close.
   ipcMain.handle('app:confirmQuit', async (_, args?: { dontAskAgain?: boolean }) => {

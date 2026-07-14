@@ -66,8 +66,11 @@
       "icon": "build/icon.png"
     },
     "nsis": {
-      "oneClick": true,
+      "oneClick": false,
       "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "displayLanguageSelector": true,
+      "installerLanguages": ["en_US", "zh_CN"],
       "include": "build/installer.nsh",
       "artifactName": "${productName}-Setup-${version}.${ext}"
     },

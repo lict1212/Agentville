@@ -204,6 +204,10 @@ const api = {
 
   // App lifecycle / version
   getAppVersion: (): Promise<string> => ipcRenderer.invoke('app:getVersion'),
+  // Language picked during install (null when not installed via the wizard,
+  // e.g. dev mode). Only meaningful before the user picks a language in-app.
+  getInstallerLanguage: (): Promise<'zh' | 'en' | null> =>
+    ipcRenderer.invoke('app:getInstallerLanguage'),
   getConfirmOnClose: (): Promise<boolean> => ipcRenderer.invoke('app:getConfirmOnClose'),
   setConfirmOnClose: (value: boolean): Promise<boolean> =>
     ipcRenderer.invoke('app:setConfirmOnClose', { value }),
