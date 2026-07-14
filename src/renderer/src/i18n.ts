@@ -473,14 +473,14 @@ export const T = {
     saving: 'Saving...',
 
     // App close confirmation
-    quitTitle: 'Quit Agentville?',
-    quitMessageIdle: 'Are you sure you want to quit?',
-    quitMessageRunning: (n: number) => `${n} agent${n === 1 ? ' is' : 's are'} still running. Their memory will be saved before quitting. Quit now?`,
+    quitTitle: 'Exit Agentville?',
+    quitMessageIdle: 'Are you sure you want to exit?',
+    quitMessageRunning: (n: number) => `${n} agent${n === 1 ? ' is' : 's are'} still running. Their memory will be saved before exiting. Exit now?`,
     quitSavingExiting: 'Saving and exiting…',
     quitDontAskAgain: "Don't ask again",
-    quitConfirm: 'Quit',
-    confirmOnCloseLabel: 'Confirm before quitting',
-    confirmOnCloseDesc: 'Show a confirmation dialog when closing the app, to prevent accidental quits. Off = quit immediately.',
+    quitConfirm: 'Exit',
+    confirmOnCloseLabel: 'Confirm before exiting',
+    confirmOnCloseDesc: 'Show a confirmation dialog when closing the app, to prevent accidental exits. Off = exit immediately.',
 
     // Auto-update
     updateSectionTitle: 'Software Update',

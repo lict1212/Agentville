@@ -1,6 +1,6 @@
 {
   "name": "agentville",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "description": "Claude Code multi-agent visual management desktop app",
   "main": "out/main/index.js",
   "scripts": {
@@ -70,7 +70,10 @@
       "perMachine": false,
       "allowToChangeInstallationDirectory": true,
       "displayLanguageSelector": true,
-      "installerLanguages": ["en_US", "zh_CN"],
+      "installerLanguages": [
+        "en_US",
+        "zh_CN"
+      ],
       "include": "build/installer.nsh",
       "artifactName": "${productName}-Setup-${version}.${ext}"
     },
