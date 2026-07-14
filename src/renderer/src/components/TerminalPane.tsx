@@ -193,6 +193,25 @@ export function TerminalPane({ project, isRunning, globalCliDefault, memoryFile,
       return true
     })
 
+    // OSC 52: clipboard-write requests from CLIs (e.g. Claude Code's
+    // "press c to copy" on its login screen). xterm.js drops these by
+    // default, and the CLI's native fallback (spawning PowerShell) can be
+    // slow or blocked, so honor the standard `<selection>;<base64>` form.
+    // Payload "?" is a clipboard READ query — ignored, we never leak
+    // clipboard contents back to the PTY.
+    const osc52Disposable = term.parser.registerOscHandler(52, (data) => {
+      const sep = data.indexOf(';')
+      if (sep === -1) return true
+      const payload = data.slice(sep + 1)
+      if (!payload || payload === '?') return true
+      try {
+        const bytes = Uint8Array.from(atob(payload), (ch) => ch.charCodeAt(0))
+        const text = new TextDecoder().decode(bytes)
+        if (text) navigator.clipboard.writeText(text).catch(() => { /* window unfocused */ })
+      } catch { /* malformed base64 — ignore */ }
+      return true
+    })
+
     terminalRef.current = term
     fitAddonRef.current = fitAddon
 
@@ -329,6 +348,7 @@ export function TerminalPane({ project, isRunning, globalCliDefault, memoryFile,
       clearInterval(refreshInterval)
       scrollDisposable.dispose()
       lineFeedDisposable.dispose()
+      osc52Disposable.dispose()
       term.dispose()
       terminalRef.current = null
       fitAddonRef.current = null
